@@ -15,7 +15,10 @@ require 'net/http'
 # NOTE: this version does not maintain any context from one prompt to the next,
 # so having a longer conversation with ChatGPT via this client is not yet
 # supported. every use of the #ask method is sent as a separate API request,
-# and does not include the context of previous prompts and replies.
+# and does not include the context of previous prompts and replies. I do expect
+# to add conversation support in the future, assuming the ChatGPT API endpoints
+# support it (as of Feb. 2023 we're still waiting for the ChatGPT API to open up
+# to the broader tech community).
 class TinyChatGpt
   API_URL = "https://api.openai.com/v1/engines/davinci/jobs".freeze
 
