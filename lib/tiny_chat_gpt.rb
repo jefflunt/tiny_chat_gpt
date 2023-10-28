@@ -1,63 +1,71 @@
 require 'json'
+require 'uri'
 require 'net/http'
+require 'tiny_color'
+require 'tty-markdown'
 
-# the TinyChatGPT class is an API adapter for OpenAI's GPT-3 based ChatGPT
-# model.  this class makes it easy to send prompts to the ChatGPT API and
-# receive responses.
+# TinyChatGpt provides an interface to OpenAI GPT API.
 #
 # usage:
-#   chatbot = ChatGPT.new("davinci", "your_api_key")
-#   puts chatbot.ask("Hello, how are you today?")
 #
-# if there is any non-200 HTTP response from the API then an instance of
-# TinyChatGpt::APIError will be raised with a helpful error message.
-#
-# NOTE: this version does not maintain any context from one prompt to the next,
-# so having a longer conversation with ChatGPT via this client is not yet
-# supported. every use of the #ask method is sent as a separate API request,
-# and does not include the context of previous prompts and replies. I do expect
-# to add conversation support in the future, assuming the ChatGPT API endpoints
-# support it (as of Feb. 2023 we're still waiting for the ChatGPT API to open up
-# to the broader tech community).
+#   api_key = 'your_api_key'
+#   model = TinyChatGpt::MODEL_3_5_TURBO
+#   chat = TinyChatGpt.new(model, api_key)
+#   response = chat.prompt('Hello, how are you?')
+#   puts response
 class TinyChatGpt
-  API_URL = "https://api.openai.com/v1/engines/davinci/jobs".freeze
+  URI = URI('https://api.openai.com/v1/chat/completions')
+  MODEL_3_5_TURBO = 'gpt-3.5-turbo'
+  MODEL_4 = 'gpt-4-0613'
 
   def initialize(model, api_key)
     @model = model
     @api_key = api_key
+    @msgs = []
   end
 
-  def ask(prompt)
-    request = {
-      prompt: prompt,
-      max_tokens: 100,
-      n: 1,
-      stop: "",
-      temperature: 0.5,
-      model: @model
+  def prompt(prompt)
+    @msgs << {
+      role: 'user',
+      content: prompt
     }
+
+    request = {
+      model: @model,
+      messages: @msgs
+    }
+
     response = _send_request(request)
 
-    if response.code == 200
-      _parse_response(response)
+    if response.code == '200'
+      TTY::Markdown.parse(_parse_ok(response))
     else
-      raise TinyChatGpt::APIError.new("ERR: non-200 HTTP status to ChatGPT: #{response.code}")
+      "#{'ERR'.light_red}: HTTP status code #{response.code}, #{_parse_error(response)}"
     end
   end
 
   def _send_request(request)
-    uri = URI(API_URL)
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = true
-    request = Net::HTTP::Post.new(uri, 'Content-Type' => 'application/json')
-    request.basic_auth(@api_key, '')
-    request.body = request.to_json
-    http.request(request)
+    Net::HTTP.post(
+      URI,
+      request.to_json,
+      {
+        'Content-Type' => 'application/json',
+        'Authorization' => "Bearer #{KEY}"
+      }
+    )
   end
 
-  def _parse_response(response)
-    response = JSON.parse(response)
-    response["choices"].first["text"]
+  def _parse_ok(response)
+    JSON
+      .parse(response.body)["choices"]
+      .first
+      .dig('message', 'content')
+  end
+
+  def _parse_error(response)
+    JSON
+      .parse(response.body)
+      .dig('error', 'message')
   end
 end
 
