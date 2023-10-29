@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name        = "tiny_chat_gpt"
-  s.version     = "1.1.0"
+  s.version     = "1.2.0"
   s.description = "a tiny ChatGPT client"
   s.summary     = "this library provides a ChatGPT client in Ruby that can be used to interact with ChatGPT programmatically"
   s.authors     = ["Jeff Lunt"]

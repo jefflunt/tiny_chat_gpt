@@ -4,7 +4,9 @@ require 'net/http'
 require 'tiny_color'
 require 'tty-markdown'
 
-# TinyChatGpt provides an interface to OpenAI GPT API.
+# TinyChatGpt provides an interface to OpenAI GPT API - every instance of this
+# class starts a new conversation, which is necessary in order to carry on a
+# conversation.
 #
 # usage:
 #
@@ -18,10 +20,20 @@ class TinyChatGpt
   MODEL_3_5_TURBO = 'gpt-3.5-turbo'
   MODEL_4 = 'gpt-4-0613'
 
+  attr_reader :prompt_tokens,
+              :completion_tokens
+
   def initialize(model, api_key)
     @model = model
     @api_key = api_key
     @msgs = []
+
+    @prompt_tokens = 0
+    @completion_tokens = 0
+  end
+
+  def total_tokens
+    prompt_tokens + completion_tokens
   end
 
   def prompt(prompt)
@@ -38,7 +50,17 @@ class TinyChatGpt
     response = _send_request(request)
 
     if response.code == '200'
-      TTY::Markdown.parse(_parse_ok(response))
+      resp = _parse_ok(response)
+      completion = resp["choices"].first.dig('message', 'content')
+      @msgs << {
+        role: 'assistant',
+        content: completion
+      }
+
+      @prompt_tokens += resp.dig('usage', 'prompt_tokens')
+      @completion_tokens += resp.dig('usage', 'completion_tokens')
+
+      TTY::Markdown.parse(completion)
     else
       "#{'ERR'.light_red}: HTTP status code #{response.code}, #{_parse_error(response)}"
     end
@@ -56,10 +78,7 @@ class TinyChatGpt
   end
 
   def _parse_ok(response)
-    JSON
-      .parse(response.body)["choices"]
-      .first
-      .dig('message', 'content')
+    JSON.parse(response.body)
   end
 
   def _parse_error(response)
